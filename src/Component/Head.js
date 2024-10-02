@@ -1,35 +1,61 @@
 import React, { useEffect, useState } from "react";
 import { toggleMenu } from "../utils/appSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { YouTube_SEARCH_API } from "../utils/constants";
+import { cacheResults } from "../utils/searchSlice";
 
 const Head = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  console.log(searchQuery);
+
+  const searchCache = useSelector((store) => store.search);
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    const timer = setTimeout(() => getSearchSugsestions(), 200);
+    const timer = setTimeout(() => {
+      if (searchCache[searchQuery]) {
+        setSuggestions(searchCache[searchQuery]);
+      } else {
+        getSearchSuggestions();
+      }
+    }, 200);
 
     return () => {
       clearTimeout(timer);
     };
   }, [searchQuery]);
 
-  const getSearchSugsestions = async () => {
-    const data = await fetch(YouTube_SEARCH_API + searchQuery);
-    const json = await data.json();
-    console.log(json);
-    setSuggestions(json[1]);
+  const getSearchSuggestions = async () => {
+    try {
+      if (searchQuery.trim()) {
+        const data = await fetch(YouTube_SEARCH_API + searchQuery);
+        const json = await data.json();
+        console.log("API Response:", json);
+
+        // Safely access the response using optional chaining
+
+        setSuggestions(json[1]);
+
+        dispatch(
+          cacheResults({
+            [searchQuery]: json[1],
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      setSuggestions([]); // Set suggestions to an empty array in case of error
+    }
   };
-  const dispatch = useDispatch();
+
   const toggleMenuHandler = () => {
     dispatch(toggleMenu());
   };
+
   return (
     <div className="grid grid-flow-col p-5 m-2 shadow-lg">
-      <div className="flex col-span-1 ">
+      <div className="flex col-span-1">
         <img
           onClick={() => toggleMenuHandler()}
           className="h-8 cursor-pointer"
@@ -57,22 +83,11 @@ const Head = () => {
           🍳
         </button>
       </div>
-      {/*{showSuggestions && (
-        <div className="fixed bg-white py-2 px-2 w-[37rem] shadow-lg rounded-lg border border-gray">
-          <ul>
-            {suggestions.map((s) => (
-              <li key={s} className="py-2 px-3 shadow-sm hover:bg-gray-100">
-                {s}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}*/}
 
       {showSuggestions && (
         <div className="fixed left-56 top-20 z-10 bg-white py-2 px-5 w-96 shadow-lg rounded-lg border border-gray">
           <ul>
-            {Array.isArray(suggestions) && suggestions.length > 0 ? (
+            {suggestions.length > 0 ? (
               suggestions.map((s) => (
                 <li key={s} className="px-2 py-2 shadow-sm hover:bg-gray-100">
                   {s}
